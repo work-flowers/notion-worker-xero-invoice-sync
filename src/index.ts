@@ -232,7 +232,7 @@ worker.sync("invoicesBackfill", {
 worker.sync("invoicesDelta", {
 	database: salesInvoices,
 	mode: "incremental",
-	schedule: "15m",
+	schedule: "6h",
 	execute: async (state: DeltaState | undefined, { notion }) => {
 		const sinceIso = state?.lastSyncIso ?? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 		const runStartedAt = new Date().toISOString();
