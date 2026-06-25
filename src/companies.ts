@@ -1,4 +1,4 @@
-import type { Client } from "@notionhq/client";
+import type { NotionClient } from "./notion.js";
 
 const GENERIC_EMAIL_DOMAINS = new Set([
 	"gmail.com",
@@ -71,7 +71,7 @@ export type CompanyIndex = {
 };
 
 export async function buildCompanyIndex(
-	notion: Client,
+	notion: NotionClient,
 	companiesDataSourceId: string,
 ): Promise<CompanyIndex> {
 	const byId = new Map<number, string>();
@@ -111,7 +111,7 @@ export async function buildCompanyIndex(
 export type CurrencyIndex = Map<string, string>;
 
 export async function buildCurrencyIndex(
-	notion: Client,
+	notion: NotionClient,
 	fxRatesDataSourceId: string,
 ): Promise<CurrencyIndex> {
 	const index = new Map<string, string>();
@@ -128,8 +128,8 @@ export async function buildCurrencyIndex(
 			if (!("properties" in page)) continue;
 			const titleProp = page.properties["Currency"];
 			if (titleProp?.type !== "title") continue;
-			const code = titleProp.title
-				.map((t) => ("plain_text" in t ? t.plain_text : ""))
+			const code = (titleProp.title as Array<{ plain_text?: string }>)
+				.map((t) => (t && "plain_text" in t ? (t.plain_text ?? "") : ""))
 				.join("")
 				.trim()
 				.toUpperCase();

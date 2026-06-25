@@ -1,4 +1,4 @@
-import type { Client } from "@notionhq/client";
+import type { NotionClient } from "./notion.js";
 
 export type InvoiceRelations = {
 	companyPageId?: string | null;
@@ -6,7 +6,7 @@ export type InvoiceRelations = {
 };
 
 export async function reconcileInvoiceRelations(
-	notion: Client,
+	notion: NotionClient,
 	managedDataSourceId: string,
 	invoiceRelations: Map<string, InvoiceRelations>,
 ): Promise<void> {

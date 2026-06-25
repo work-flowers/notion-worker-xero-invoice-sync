@@ -8,6 +8,14 @@ Xero is reached through the [Zapier SDK](https://docs.zapier.com/sdk) using
 the existing `Xero work.flowers` connection — no direct Xero OAuth setup is
 required.
 
+The auxiliary Notion REST calls (reading the Companies / FX Rates indexes and
+writing the `Company` / `Currency` relations) also go through the Zapier SDK,
+using a **Notion connection** in Zapier. This means the worker does **not**
+require a separate `NOTION_API_TOKEN` internal integration — Zapier injects the
+connection's Notion OAuth credentials on each request. (The managed
+`Sales Invoices` database writes are handled by the Notion Workers platform
+itself and never used that token.)
+
 ## Capabilities
 
 | Key | Mode | Schedule | What it does |
@@ -15,7 +23,8 @@ required.
 | `invoicesBackfill` | replace | manual | Paginates all sales invoices from Xero. Run once after first deploy. |
 | `invoicesDelta` | incremental | every 15 minutes | Pulls invoices updated since the last successful run (using Xero's `If-Modified-Since` header). |
 
-Both syncs share an `xero` pacer (8 req/s).
+Both syncs share an `xero` pacer (8 req/s) and a `notion` pacer (3 req/s, used
+for the auxiliary Notion REST calls).
 
 ## Managed database schema
 
@@ -58,8 +67,10 @@ For each upserted invoice, the worker resolves and sets two relations via
 
 ```
 src/
-├── index.ts        # Worker, managed DB schema, pacer, syncs
+├── index.ts        # Worker, managed DB schema, pacers, syncs
+├── zapier.ts       # Shared Zapier SDK instance (auth for Xero + Notion fetch)
 ├── xero.ts         # Direct Xero REST API calls via zapier.fetch
+├── notion.ts       # Notion REST client via zapier.fetch (no NOTION_API_TOKEN)
 ├── companies.ts    # Domain normalization + Companies/FX-Rates indexes
 └── reconcile.ts    # Notion API updates for Company + Currency relations
 ```
@@ -75,10 +86,10 @@ Set via `ntn workers env set`. All are required except where noted.
 
 | Name | Value |
 |---|---|
-| `NOTION_API_TOKEN` | Internal integration token. The integration must be connected to the managed Sales Invoices DB, the Companies DB, and the FX Rates DB. |
 | `ZAPIER_CLIENT_ID` | From `npx zapier-sdk create-client-credentials`. |
 | `ZAPIER_CLIENT_SECRET` | Same as above. Secret is shown once — save immediately. |
 | `XERO_ZAPIER_CONNECTION_ID` | The Xero connection ID in Zapier (`02336808-1736-878b-a0a8-87e02bb0aec3` for `Xero work.flowers`). |
+| `NOTION_ZAPIER_CONNECTION_ID` | The Notion connection ID in Zapier. The Notion OAuth grant for this connection must have access to the managed Sales Invoices DB, the Companies DB, and the FX Rates DB. |
 | `XERO_ORGANIZATION_ID` | The Xero tenant ID (`62699a8c-3351-40e8-9265-bdca5e037b03` for work.flowers). |
 | `COMPANIES_DATA_SOURCE_ID` | `21991b07-11ac-80b0-b787-000b3d3995f6` |
 | `FX_RATES_DATA_SOURCE_ID` | `19391b07-11ac-80b9-abab-000b44470272` |
@@ -93,7 +104,12 @@ ntn workers deploy                 # creates the managed Sales Invoices DB
 
 In Notion: open the new Sales Invoices database and:
 
-1. Connect the integration to the new DB, the Companies DB, and the FX Rates DB.
+1. Make sure the **Notion connection in Zapier** has access to the new DB, the
+   Companies DB, and the FX Rates DB. When authorizing the Notion connection in
+   Zapier, share those pages/databases with it (Notion's OAuth flow asks which
+   pages to grant). To grant access to a database created after the connection
+   was authorized, open it in Notion → `•••` → `Connections` → add the Zapier
+   Notion connection.
 2. Add the user-managed properties listed above (`Company`, `Currency`, `FX Rate (USD)`, `Amount (USD)`).
 
 Then set the remaining secrets and trigger the backfill:
@@ -119,7 +135,7 @@ ntn workers sync trigger <key>        # run now
 
 Common reasons relations stay empty:
 
-- Integration not connected to the Companies / FX Rates DB.
+- The Zapier Notion connection doesn't have access to the Companies / FX Rates DB.
 - `SALES_INVOICES_DATA_SOURCE_ID` not set.
 - Brand-new invoice — its page doesn't exist when reconciliation runs in the same cycle. The relation is set on the next cycle (~15 min lag).
 - No `AccountNumber` and no resolvable non-generic domain on the Xero contact — `Matched Domain` will be empty.
@@ -128,4 +144,4 @@ Common reasons relations stay empty:
 
 - One-way sync only (Xero → Notion). Edits in Notion are not pushed back.
 - Worker-managed schema means renames / type changes in code can drop the column. User-added properties (`Company`, `Currency`, `FX Rate (USD)`, `Amount (USD)`) survive.
-- The Zapier connection must remain valid — if it expires, re-authenticate it in Zapier and redeploy.
+- The Zapier connections (Xero **and** Notion) must remain valid — if either expires, re-authenticate it in Zapier and redeploy. Routing Notion through Zapier means an expired Zapier connection takes down relation reconciliation and index lookups too, not just Xero.
