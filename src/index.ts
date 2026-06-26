@@ -65,6 +65,7 @@ const salesInvoices = worker.database("salesInvoices", {
 			Amount: Schema.number(),
 			"Currency Code": Schema.richText(),
 			"Xero URL": Schema.url(),
+			"Contact Name": Schema.richText(),
 			"Xero Contact ID": Schema.richText(),
 			"Matched Domain": Schema.richText(),
 		},
@@ -91,6 +92,7 @@ function invoiceProperties(invoice: XeroInvoice, matchedDomain: string | null) {
 		Amount: Builder.number(toNumber(invoice.Total) ?? 0),
 		"Currency Code": Builder.richText(invoice.CurrencyCode ?? ""),
 		"Xero URL": Builder.url(xeroInvoiceUrl(invoice.InvoiceID)),
+		"Contact Name": Builder.richText(invoice.Contact?.Name ?? ""),
 		"Xero Contact ID": Builder.richText(invoice.Contact?.ContactID ?? ""),
 		"Matched Domain": Builder.richText(matchedDomain ?? ""),
 	};
