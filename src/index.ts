@@ -1,7 +1,7 @@
 import { Worker } from "@notionhq/workers";
 import * as Schema from "@notionhq/workers/schema";
 import * as Builder from "@notionhq/workers/builder";
-import type { Client } from "@notionhq/client";
+import { getNotion, type NotionClient } from "./notion.js";
 
 import {
 	fetchAllContacts,
@@ -31,6 +31,16 @@ const xeroPacer = worker.pacer("xero", {
 	allowedRequests: 8,
 	intervalMs: 1000,
 });
+
+// Notion's public API allows ~3 req/s. The auxiliary reads/writes (Company & FX
+// indexes, relation reconciliation) go through Zapier's Notion connection, so we
+// pace them ourselves rather than relying on a NOTION_API_TOKEN integration.
+const notionPacer = worker.pacer("notion", {
+	allowedRequests: 3,
+	intervalMs: 1000,
+});
+
+const notion = getNotion(notionPacer);
 
 const salesInvoices = worker.database("salesInvoices", {
 	type: "managed",
@@ -153,7 +163,7 @@ async function resolveMatchesForBatch(
 
 async function buildChangesAndReconcile(
 	invoices: XeroInvoice[],
-	notion: Client,
+	notion: NotionClient,
 ): Promise<ReturnType<typeof toUpsertChange>[]> {
 	const companiesDataSourceId = process.env.COMPANIES_DATA_SOURCE_ID;
 	const fxRatesDataSourceId = process.env.FX_RATES_DATA_SOURCE_ID;
@@ -219,7 +229,7 @@ worker.sync("invoicesBackfill", {
 	database: salesInvoices,
 	mode: "replace",
 	schedule: "manual",
-	execute: async (state: BackfillState | undefined, { notion }) => {
+	execute: async (state: BackfillState | undefined) => {
 		const page = state?.page ?? 1;
 		await xeroPacer.wait();
 		const invoices = await fetchInvoicesPage(page);
@@ -233,7 +243,7 @@ worker.sync("invoicesDelta", {
 	database: salesInvoices,
 	mode: "incremental",
 	schedule: "6h",
-	execute: async (state: DeltaState | undefined, { notion }) => {
+	execute: async (state: DeltaState | undefined) => {
 		const sinceIso = state?.lastSyncIso ?? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 		const runStartedAt = new Date().toISOString();
 

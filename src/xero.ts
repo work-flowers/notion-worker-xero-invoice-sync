@@ -1,4 +1,4 @@
-import { createZapierSdk } from "@zapier/zapier-sdk";
+import { sdk } from "./zapier.js";
 
 export type XeroInvoice = {
 	InvoiceID: string;
@@ -25,18 +25,6 @@ export type XeroContact = {
 	Website?: string | null;
 	ContactPersons?: Array<{ EmailAddress?: string | null }> | null;
 };
-
-let _sdk: ReturnType<typeof createZapierSdk> | null = null;
-function sdk() {
-	if (_sdk) return _sdk;
-	const clientId = process.env.ZAPIER_CLIENT_ID;
-	const clientSecret = process.env.ZAPIER_CLIENT_SECRET;
-	if (!clientId || !clientSecret) {
-		throw new Error("ZAPIER_CLIENT_ID and ZAPIER_CLIENT_SECRET must be set");
-	}
-	_sdk = createZapierSdk({ credentials: { clientId, clientSecret } });
-	return _sdk;
-}
 
 function connectionId(): string {
 	const id = process.env.XERO_ZAPIER_CONNECTION_ID;
