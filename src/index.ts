@@ -168,22 +168,29 @@ async function buildChangesAndReconcile(
 	const companiesDataSourceId = process.env.COMPANIES_DATA_SOURCE_ID;
 	const fxRatesDataSourceId = process.env.FX_RATES_DATA_SOURCE_ID;
 
+	// Notion failures below are intentionally NOT swallowed: a broken Notion path
+	// (unset ZAPIER_NOTION_CONNECTION_ID, a 404 from a database not shared with the
+	// Zapier Notion connection, an expired connection) is a misconfiguration that
+	// must fail the sync loudly — otherwise the run reports HEALTHY while silently
+	// writing no relations. When a *_DATA_SOURCE_ID env var is unset, the matching
+	// enrichment is intentionally skipped (no throw); when it is set but the call
+	// fails, we rethrow with actionable context so it surfaces in sync status.
 	let companies: CompanyIndex | null = null;
 	if (companiesDataSourceId) {
-		try {
-			companies = await buildCompanyIndex(notion, companiesDataSourceId);
-		} catch (err) {
-			console.warn(`Failed to build Company index: ${(err as Error).message}`);
-		}
+		companies = await withNotionContext(
+			"Company index build",
+			"COMPANIES_DATA_SOURCE_ID",
+			() => buildCompanyIndex(notion, companiesDataSourceId),
+		);
 	}
 
 	let currencies: CurrencyIndex | null = null;
 	if (fxRatesDataSourceId) {
-		try {
-			currencies = await buildCurrencyIndex(notion, fxRatesDataSourceId);
-		} catch (err) {
-			console.warn(`Failed to build Currency index: ${(err as Error).message}`);
-		}
+		currencies = await withNotionContext(
+			"Currency index build",
+			"FX_RATES_DATA_SOURCE_ID",
+			() => buildCurrencyIndex(notion, fxRatesDataSourceId),
+		);
 	}
 
 	const matches = await resolveMatchesForBatch(invoices, companies, currencies);
@@ -205,15 +212,36 @@ async function buildChangesAndReconcile(
 			}
 		}
 		if (relations.size > 0) {
-			try {
-				await reconcileInvoiceRelations(notion, managedDsId, relations);
-			} catch (err) {
-				console.warn(`Invoice relation reconciliation failed: ${(err as Error).message}`);
-			}
+			await withNotionContext(
+				"Invoice relation reconciliation",
+				"SALES_INVOICES_DATA_SOURCE_ID",
+				() => reconcileInvoiceRelations(notion, managedDsId, relations),
+			);
 		}
 	}
 
 	return changes;
+}
+
+/**
+ * Runs a Notion-backed step and, on failure, rethrows with actionable context.
+ * Failing (rather than warn-and-continue) is deliberate: it turns an otherwise
+ * invisible misconfiguration into a failed sync run visible in `ntn workers sync
+ * status`. The hint points at the two things that actually break this path:
+ * the data source id and whether the Zapier Notion connection can see it.
+ */
+async function withNotionContext<T>(
+	label: string,
+	dataSourceEnvVar: string,
+	fn: () => Promise<T>,
+): Promise<T> {
+	try {
+		return await fn();
+	} catch (err) {
+		throw new Error(
+			`${label} failed: ${(err as Error).message} — verify ZAPIER_NOTION_CONNECTION_ID is set and that the Zapier Notion connection is shared with the database referenced by ${dataSourceEnvVar} (Notion: ••• → Connections).`,
+		);
+	}
 }
 
 function toUpsertChange(invoice: XeroInvoice, matchedDomain: string | null) {
