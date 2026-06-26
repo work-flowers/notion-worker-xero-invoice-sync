@@ -89,7 +89,7 @@ Set via `ntn workers env set`. All are required except where noted.
 | `ZAPIER_CLIENT_ID` | From `npx zapier-sdk create-client-credentials`. |
 | `ZAPIER_CLIENT_SECRET` | Same as above. Secret is shown once — save immediately. |
 | `XERO_ZAPIER_CONNECTION_ID` | The Xero connection ID in Zapier (`02336808-1736-878b-a0a8-87e02bb0aec3` for `Xero work.flowers`). |
-| `NOTION_ZAPIER_CONNECTION_ID` | The Notion connection ID in Zapier. The Notion OAuth grant for this connection must have access to the managed Sales Invoices DB, the Companies DB, and the FX Rates DB. |
+| `ZAPIER_NOTION_CONNECTION_ID` | The Notion connection ID in Zapier (`02b73654-15c8-85c3-b16a-07304d2beb17` for `work.flowers`). The Notion OAuth grant for this connection must have access to the managed Sales Invoices DB, the Companies DB, and the FX Rates DB. (Cannot use a `NOTION_`-prefixed name — that prefix is reserved by the Notion Workers platform.) |
 | `XERO_ORGANIZATION_ID` | The Xero tenant ID (`62699a8c-3351-40e8-9265-bdca5e037b03` for work.flowers). |
 | `COMPANIES_DATA_SOURCE_ID` | `21991b07-11ac-80b0-b787-000b3d3995f6` |
 | `FX_RATES_DATA_SOURCE_ID` | `19391b07-11ac-80b9-abab-000b44470272` |

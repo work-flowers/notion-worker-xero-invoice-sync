@@ -44,8 +44,8 @@ export type NotionClient = {
 export type Pacer = { wait: () => Promise<void> };
 
 function connectionId(): string {
-	const id = process.env.NOTION_ZAPIER_CONNECTION_ID;
-	if (!id) throw new Error("NOTION_ZAPIER_CONNECTION_ID must be set");
+	const id = process.env.ZAPIER_NOTION_CONNECTION_ID;
+	if (!id) throw new Error("ZAPIER_NOTION_CONNECTION_ID must be set");
 	return id;
 }
 
