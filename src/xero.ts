@@ -8,6 +8,7 @@ export type XeroInvoice = {
 	Status?: string | null;
 	Date?: string | null;
 	DueDate?: string | null;
+	ExpectedPaymentDate?: string | null;
 	FullyPaidOnDate?: string | null;
 	Total?: number | string | null;
 	AmountDue?: number | string | null;
